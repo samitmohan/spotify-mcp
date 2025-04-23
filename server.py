@@ -1,4 +1,5 @@
 # server.py
+import json
 import mcp.server.fastmcp
 import requests
 from spotipy import Spotify
@@ -7,10 +8,13 @@ from spotipy.oauth2 import SpotifyOAuth
 auth = SpotifyOAuth(
     client_id="5b9cbf0ca9a74465b95990d35533b683",
     client_secret="cef1471968c64093bf54d55a1b0030df",
-    redirect_uri="https://677f-2401-4900-1c66-8714-2985-b5c4-138c-e774.ngrok-free.app/callback/",
-    scope="user-modify-playback-state user-read-playback-state user-read-currently-playing"
+    redirect_uri="https://baef-2401-4900-1c66-8714-2985-b5c4-138c-e774.ngrok-free.app/callback",
+    scope="user-modify-playback-state user-read-playback-state user-read-currently-playing",
+    cache_path=".cache",
+    open_browser=True
 )
 
+token_info = auth.get_access_token(as_dict=False)
 sp = Spotify(auth_manager=auth)
 
 # Create an MCP server
@@ -35,12 +39,18 @@ def next_track():
     sp.next_track()
     return "Skipped to next track!"
 
-@server.tool()
+@server.tool
 def addQueue(query: str):
     """Adds user choice of song to queue for next"""
-    song_name = query
-    sp.add_to_queue(song_name)
-    return "Added to queue!"
+    # First, search for the track
+    results = sp.search(q=query, limit=1, type="track")
+    if not results["tracks"]["items"]:
+        return f"Could not find '{query}'."
+
+    # Extract the URI and add to queue
+    uri = results["tracks"]["items"][0]["uri"]
+    sp.add_to_queue(uri)
+    return f"Added '{query}' to queue!"
 
 @server.tool()
 def play_song(query: str):
@@ -110,3 +120,4 @@ def add_song_to_named_playlist(song: str, playlist_name: str) -> str:
 
 if __name__ == "__main__":
     server.run(transport='stdio')
+    # server.run(transport='http', host='0.0.0.0', port=3000)
