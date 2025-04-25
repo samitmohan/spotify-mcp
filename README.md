@@ -33,27 +33,26 @@ To start-:
 
 Features-:
 🔊 Playback Controls
-  ✅ Play/pause/next
-  🔁 Shuffle and repeat modes
-  🎧 Play full album by name
-  🔄 Autoplay based on mood (infinite playlist)
+  - ✅ Play/pause/next
+  - 🔁 Shuffle and repeat modes
+  - 🎧 Play full album by name
+  - 🔄 Autoplay based on mood (infinite playlist)
 
 🎶 Playlist Wizardry
-📀 Create playlists by:
-  Genre
-  Mood
-  Custom song list
-  ➕ Add a song to an existing playlist by name
-  🗑️ Delete playlists by name
-  🎯 Fetch playlist content with track + artist
+- Create playlists by:
+  - Genre, mood, custom song list
+  - ➕ Add a song to an existing playlist by name
+  - 🗑️ Delete playlists by name
+  - 🎯 Fetch playlist content with track + artist
 
-🎙️ Lyrics & Info
-  📃 Get lyrics of any song (Genius API)
-  🎵 Get lyrics of currently playing song
-  📌 Show current playing song + metadata
+- 🎙️ Lyrics & Info
+  - 📃 Get lyrics of any song (Genius API)
+  - 🎵 Get lyrics of currently playing song
+  - 📌 Show current playing song + metadata
 
-💡 Smart Recommendations
-  🧠 Recommend songs based on recent listening
-  👥 Get recently played artists
-  🔍 Find albums by artist
-  📚 List liked songs
+- 💡 Smart Recommendations
+  - 🧠 Recommend songs based on recent listening
+  - 👥 Get recently played artists
+  - 🔍 Find albums by artist
+  - 📚 List liked songs
+  - Recommends songs based on history
