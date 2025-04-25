@@ -1,20 +1,62 @@
-# server.py
 import re
 import time
+from bs4 import BeautifulSoup
 import json
 import mcp.server.fastmcp
 import requests
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 
+GENIUS_API_KEY = 'api_key'  
+GENIUS_BASE_URL = "https://api.genius.com"
+
 auth = SpotifyOAuth(
     client_id="id",
     client_secret="secret",
-    redirect_uri="https://baef-2401-4900-1c66-8714-2985-b5c4-138c-e774.ngrok-free.app/callback",
-    scope="user-modify-playback-state user-read-playback-state user-read-currently-playing playlist-modify-public playlist-modify-private",
+    redirect_uri="https://7a2d-2401-4900-1c66-8714-384b-cd3a-6f79-58bb.ngrok-free.app/callback",
+
+    scope="user-library-read user-read-recently-played user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-modify-public playlist-modify-private",
     cache_path=".cache",
     open_browser=True
 )
+
+def get_genius_lyrics(song_name: str, artist_name: str = "") -> str:
+    '''Search Genius by song and optional artist, extract lyrics from page'''
+    search_query = f"{song_name} {artist_name}".strip()
+    search_url = f"{GENIUS_BASE_URL}/search"
+    headers = {"Authorization": f"Bearer {GENIUS_API_KEY}"}
+    params = {"q": search_query}
+
+    response = requests.get(search_url, headers=headers, params=params)
+    if response.status_code != 200:
+        return f"Genius API error: {response.status_code}"
+
+    hits = response.json().get("response", {}).get("hits", [])
+    if not hits:
+        return f"No lyrics found for '{search_query}'."
+
+    # find match
+    match = None
+    for hit in hits:
+        primary_artist = hit["result"]["primary_artist"]["name"].lower()
+        if artist_name.lower() in primary_artist:
+            match = hit
+            break
+    if not match:
+        match = hits[0]  # fallback to first result
+
+    song_url = match["result"]["url"]
+    page = requests.get(song_url)
+    if page.status_code != 200:
+        return "Could not load Genius lyrics page."
+
+    soup = BeautifulSoup(page.text, "html.parser")
+    lyrics_divs = soup.find_all("div", class_=re.compile("^Lyrics__Container"))
+    if not lyrics_divs:
+        return "Lyrics not found on Genius page."
+
+    lyrics = "\n\n".join(div.get_text(separator="\n").strip() for div in lyrics_divs)
+    return lyrics
 
 token_info = auth.get_access_token(as_dict=False)
 sp = Spotify(auth_manager=auth)
@@ -64,35 +106,16 @@ def play_song(query: str):
     return f"Playing {query}."
 
 @server.tool()
-def spotify_current_track() -> str:
+def now_playing():
     """What's playing now?"""
     current = sp.current_playback()
-    if current and current['item']:
-        track = current['item']
-        return f"Currently playing: {track['name']} by {track['artists'][0]['name']}"
-    return "Nothing is currently playing."
-
-"""
-Do I even need this?
-@server.tool()
-def create_playlist_from_genre(genre: str) -> str:
-    user = sp.me()
-    user_id = user["id"]
-    
-    playlist_name = f"{genre.title()} Vibes"
-    playlist = sp.user_playlist_create(user_id, playlist_name, public=False)
-    
-    # Search for tracks by genre
-    results = sp.search(q=f"genre:{genre}", type="track", limit=13)
-    tracks = results["tracks"]["items"]
-    
-    if not tracks: return f"No tracks found for genre '{genre}'."
-
-    track_uris = [track["uri"] for track in tracks]
-    sp.playlist_add_items(playlist["id"], track_uris)
-
-    return f"Created playlist '{playlist_name}' with {len(track_uris)} {genre} tracks."
-"""
+    if not current or not current["item"]:
+        return "Nothing playing."
+    track = current["item"]
+    name = track["name"]
+    artist = track["artists"][0]["name"]
+    lyrics = get_genius_lyrics(name, artist)
+    return f"Currenly playing: {name} by {artist}\n\n{lyrics}"
 
 # Can I integrate this into the mood function?
 @server.tool()
@@ -146,7 +169,7 @@ def spotify_getInfo() -> dict | str:
         "artist": track["artists"][0]["name"],
         "album": track["album"]["name"],
         "release_date": track["album"]["release_date"],
-        "uri": track["uri"],
+        "uri": track["external_urls"]["spotify"] 
     }
 
 @server.tool()
@@ -167,7 +190,7 @@ def get_myPlaylists() -> str:
 
 @server.tool()
 def get_songs_from_playlist(playlist_id: str) -> str:
-    """ Returns list of all songs from the playlist"""
+    """ Returns list of all songs from the playlist, along with artist"""
     song_names = []
     offset = 0
     while True:
@@ -176,7 +199,9 @@ def get_songs_from_playlist(playlist_id: str) -> str:
         for item in items:
             track = item.get("track")
             if track:
-                song_names.append(track["name"])
+                name = track["name"]
+                artist = track["artists"][0]["name"]
+                song_names.append(f"{name} - {artist}")
         if response.get("next"):
             offset += 100
         else:
@@ -286,10 +311,17 @@ def create_playlist_from_mood(mood: str) -> str:
         "chill": ["acoustic", "lofi", "ambient"],
         "energetic": ["rock", "electronic", "metal"],
     }
-    genre = mood_genres.get(mood.lower())
-    if not genre:
+    genre_list = mood_genres.get(mood.lower())
+    if not genre_list:
         return f"Mood '{mood}' not recognized. Try 'happy', 'chill', or 'energetic'."
-    return create_playlist_from_genre(genre[0])  # Use the genre to generate playlist
+
+    available_genres = sp.recommendation_genre_seeds()
+    valid_genres = [g for g in genre_list if g in available_genres]
+    if not valid_genres:
+        return f"No valid genres found for mood '{mood}'."
+    
+    return create_playlist_from_genre(valid_genres[0])
+
 
 @server.tool()
 def delete_playlist(playlist_name: str) -> str:
@@ -307,46 +339,20 @@ def delete_playlist(playlist_name: str) -> str:
     sp.user_playlist_unfollow(user_id, target["id"])
     return f"Playlist '{playlist_name}' has been deleted."
 
-"""
-GENIUS_API_KEY = 'apikey'  
-GENIUS_BASE_URL = 'https://api.genius.com'
 
-def get_genius_lyrics(song_name: str) -> str:
-    '''Fetch lyrics from the Genius API'''
-    search_url = f"{GENIUS_BASE_URL}/search"
-    params = {'q': song_name}
-    headers = {'Authorization': f'Bearer {GENIUS_API_KEY}'}
-    
-    # GET request
-    response = requests.get(search_url, params=params, headers=headers)
-    response_data = response.json()
+@server.tool() 
+def get_lyrics(song_name: str, artist_name: str = "") -> str:
+    '''Fetches lyrics for the song from Genius API'''
+    return get_genius_lyrics(song_name, artist_name)
 
-    if response_data['response']['hits']:
-        # best match
-        song_info = response_data['response']['hits'][0]['result']
-        song_url = song_info['url']
-        
-        # fetch lyrics
-        song_page = requests.get(song_url)
-        song_page_content = song_page.text
-        
-        # regex magic (html -> regex)
-        lyrics_match = re.search(r'<div class="lyrics">.*?<p>(.*?)</p>', song_page_content, re.S)
-        if lyrics_match:
-            lyrics = lyrics_match.group(1).replace('<br/>', '\n')  # Clean up the lyrics
-            return lyrics
-        else:
-            return "Lyrics not found on Genius."
-    else:
-        return "Song not found in Genius database."
-
-# TODO : add genius api integeration for lyrics
 @server.tool()
-def get_lyrics(song_name: str) -> str:
-    lyrics = genius_api.get_lyrics(song_name)  # Assuming integration with Genius
-    return lyrics if lyrics else "Lyrics not found."
-"""
+def recommend_from_history() -> str:
+    """ What should I listen to? Recommends users songs from recently played"""
+    tracks = sp.current_user_recently_played(limit=10)["items"]
+    seed_tracks = [t["track"]["id"] for t in tracks[:5]]
+    recommendations = sp.recommendations(seed_tracks=seed_tracks, limit=10)["tracks"]
+    names = [f"{t['name']} — {t['artists'][0]['name']}" for t in recommendations]
+    return "Try these:\n" + "\n".join(names)
 
 if __name__ == "__main__":
     server.run(transport='stdio')
-
