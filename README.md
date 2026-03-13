@@ -1,58 +1,132 @@
-Blog-:
-https://samit.bearblog.dev/mcp-servers/
+# Spotify MCP Server
 
-Video Demo-:
-https://youtu.be/BExl8jhthoE
+An MCP (Model Context Protocol) server that connects Claude to Spotify. It exposes 21 tools that let Claude control playback, manage playlists, fetch lyrics, and recommend music - all through natural language.
 
-To start-:
+**Blog post:** https://samit.bearblog.dev/mcp-servers/
+**Video demo:** https://youtu.be/BExl8jhthoE
 
-1. Clone repo
-2. Download dependencies -> uv, requests, mcp, spotipy via pip
-3. Use ngrok for tunnelling localhost -> ngrok http 3000 {spotify doesn't support localhost anymore}
-4. Go to Spotify Dashboard and get your client ID and secret ID, paste that in server.py
-5. In dashboard create a new app and add the redirect uri = your ngrok url
-6. Download Claude Local -> Go to settings -> Edit configuration and edit the claude_desktop_config.json to the following and restart Claude-:
+## How it works
+
+MCP is a protocol that lets AI assistants call external tools. This server registers Spotify actions as MCP tools, so when you ask Claude Desktop something like "play some chill music," it can directly call the Spotify API on your behalf.
+
+```
+You (natural language) -> Claude Desktop -> MCP Server -> Spotify API
+```
+
+## Prerequisites
+
+- Python 3.13+
+- [uv](https://docs.astral.sh/uv/) (package manager)
+- A [Spotify Developer](https://developer.spotify.com/dashboard) account with a registered app
+- A [Genius API](https://genius.com/api-clients) key (for lyrics)
+- [Claude Desktop](https://claude.ai/download)
+
+## Setup
+
+### 1. Clone and install dependencies
+
+```bash
+git clone https://github.com/yourusername/spotify-mcp.git
+cd spotify-mcp
+uv sync
+```
+
+### 2. Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
+- `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` from your Spotify Developer Dashboard
+- `SPOTIFY_REDIRECT_URI` - your redirect URI (use ngrok since Spotify doesn't support localhost)
+- `GENIUS_API_KEY` from the Genius API
+
+### 3. Set up the redirect URI
+
+Spotify doesn't support `localhost` as a redirect URI. Use ngrok to tunnel:
+
+```bash
+ngrok http 3000
+```
+
+Copy the ngrok URL and add it as a redirect URI in your Spotify Developer Dashboard app settings. Set it as `SPOTIFY_REDIRECT_URI` in your `.env`.
+
+### 4. Configure Claude Desktop
+
+Open Claude Desktop settings and edit `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "spotify": {
-      "command": "/Users/smol/.local/bin/uv",
+      "command": "<path-to-uv>",
       "args": [
         "--directory",
-        "/Users/smol/fun/mcp-server/mcp-server-demo",
+        "<path-to-spotify-mcp>",
         "run",
         "server.py"
-      ]
+      ],
+      "env": {
+        "SPOTIFY_CLIENT_ID": "your_client_id",
+        "SPOTIFY_CLIENT_SECRET": "your_client_secret",
+        "SPOTIFY_REDIRECT_URI": "your_redirect_uri",
+        "GENIUS_API_KEY": "your_genius_api_key"
+      }
     }
   }
 }
 ```
 
-7. uv run server.py and open Claude again. Now you'll see all the MCP tools and you can ask Claude to access Spotify for you.
+Replace `<path-to-uv>` with the output of `which uv` and `<path-to-spotify-mcp>` with the project directory.
 
-Features-:
-🔊 Playback Controls
-  - ✅ Play/pause/next
-  - 🔁 Shuffle and repeat modes
-  - 🎧 Play full album by name
-  - 🔄 Autoplay based on mood (infinite playlist)
+### 5. Start the server
 
-🎶 Playlist Wizardry
-- Create playlists by:
-  - Genre, mood, custom song list
-  - ➕ Add a song to an existing playlist by name
-  - 🗑️ Delete playlists by name
-  - 🎯 Fetch playlist content with track + artist
+```bash
+uv run server.py
+```
 
-- 🎙️ Lyrics & Info
-  - 📃 Get lyrics of any song (Genius API)
-  - 🎵 Get lyrics of currently playing song
-  - 📌 Show current playing song + metadata
+Restart Claude Desktop. You should see the Spotify MCP tools available.
 
-- 💡 Smart Recommendations
-  - 🧠 Recommend songs based on recent listening
-  - 👥 Get recently played artists
-  - 🔍 Find albums by artist
-  - 📚 List liked songs
-  - Recommends songs based on history
+## Features
+
+**Playback Controls**
+- Play, pause, skip tracks
+- Shuffle and repeat modes
+- Play a full album by name
+- Queue songs by name
+
+**Playlist Management**
+- Create playlists by genre, mood, or custom song list
+- Add songs to existing playlists by name
+- Delete playlists by name
+- List all playlists with links
+- Fetch playlist contents
+
+**Lyrics and Info**
+- Get lyrics for any song (via Genius API)
+- Get lyrics for the currently playing song
+- Show current track metadata
+
+**Discovery**
+- Recommend songs based on listening history
+- List recently played artists
+- Find albums by artist
+- List liked songs
+
+## Development
+
+```bash
+# Run tests
+uv run pytest
+
+# Lint
+uv run ruff check .
+
+# Format
+uv run ruff format .
+```
+
+## License
+
+MIT

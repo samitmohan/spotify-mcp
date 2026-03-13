@@ -1,11 +1,19 @@
 [project]
-name = "mcp-server-demo"
+name = "spotify-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP server that lets Claude control Spotify playback, manage playlists, fetch lyrics, and recommend music"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.13"
 dependencies = [
+    "beautifulsoup4",
     "mcp[cli]>=1.6.0",
     "requests",
     "spotipy",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
 ]
